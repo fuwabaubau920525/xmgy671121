@@ -1,5 +1,7 @@
 # 喵喵怪游標 for Mac
 
+[![macOS 驗證](https://github.com/fuwabaubau920525/xmgy671121/actions/workflows/macos-validate.yml/badge.svg)](https://github.com/fuwabaubau920525/xmgy671121/actions/workflows/macos-validate.yml)
+
 把 7 組「喵喵怪」動畫游標（箭頭、等待、文字輸入、忙碌等）一鍵安裝到 macOS 的小工具。
 雙擊開啟、按幾個鍵就完成，不需要打開終端機。
 
