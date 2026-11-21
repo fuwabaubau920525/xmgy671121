@@ -75,6 +75,19 @@ A：本 App 是 `LSUIElement`（不顯示 Dock 圖示），流程會在視窗中
 **Q：游標沒有變？**
 A：Mousecape 套用後，部分 App 需要重新啟動；也請確認「系統設定 → 輔助使用 → 指標控制」中的游標大小不是最小。
 
+## 自動驗證（GitHub Actions）
+
+每次推送 `mac/` 的變更，GitHub 會在雲端的 macOS 虛擬機上自動執行
+[`.github/workflows/macos-validate.yml`](.github/workflows/macos-validate.yml)：
+
+- 檢查 `Info.plist`、`AppSettings.plist` 與 7 組 `.cape` 格式
+- 確認 `launcher` / `script` 有執行權限，且 `launcher` 是 arm64 + x86_64 universal
+- 確認 `script` 語法正確、純 LF，且與 `src/script.sh` 一致
+- 驗證發佈 zip 的完整性、權限，並與 `喵喵怪游標.app` 逐檔比對
+- 用假的 `osascript` / `Mousecape` 在無介面環境跑一次「安裝 → 還原 → 移除」
+
+> 雲端 macOS 沒有圖形桌面可以操作，這是自動化驗證，不是遠端桌面。
+
 ## 授權與致謝
 
 - 游標美術：本專案作者。

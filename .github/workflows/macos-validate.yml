@@ -1,0 +1,296 @@
+name: macOS 驗證
+
+# 在 GitHub 提供的雲端 macOS 上，自動檢查 .app 的結構、權限、plist、
+# 執行檔架構與發佈 zip，並用假的 osascript / Mousecape 跑一次完整流程。
+#
+# 注意：這是「自動化驗證」，不是遠端桌面，無法用滑鼠操作 GUI。
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mac/**'
+      - '.github/workflows/**'
+      - '.gitattributes'
+  pull_request:
+    paths:
+      - 'mac/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: 靜態檢查（結構 / plist / 架構 / zip）
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      APP: mac/喵喵怪游標.app
+      ZIP: mac/喵喵怪游標-for-Mac.zip
+
+    steps:
+      - name: 取出原始碼
+        uses: actions/checkout@v4
+
+      - name: 顯示執行環境
+        run: |
+          sw_vers
+          echo "arch: $(uname -m)"
+          echo "bash: $BASH_VERSION"
+
+      - name: 檢查執行權限
+        run: |
+          set -euo pipefail
+          for f in "$APP/Contents/MacOS/launcher" "$APP/Contents/Resources/script"; do
+            test -f "$f" || { echo "::error::缺少 $f"; exit 1; }
+            test -x "$f" || { echo "::error::$f 沒有執行權限（chmod +x）"; exit 1; }
+            echo "OK  $f  ($(stat -f '%Sp %z bytes' "$f"))"
+          done
+
+      - name: 驗證 plist 與 7 組 .cape
+        run: |
+          set -euo pipefail
+          plutil -lint "$APP/Contents/Info.plist" "$APP/Contents/Resources/AppSettings.plist"
+          for f in mac/capes/*.cape; do plutil -lint "$f"; done
+
+          for k in banana dog fairy halloween niuniu run wand; do
+            test -f "$APP/Contents/Resources/capes/$k.cape" \
+              || { echo "::error::App 內缺少 $k.cape"; exit 1; }
+          done
+
+          test -f "$APP/Contents/Resources/AppIcon.icns"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")" = "launcher"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist")" = "true"
+          echo "plist / 7 組 capes / 圖示 OK"
+
+      - name: 檢查 launcher 是 universal Mach-O
+        run: |
+          set -euo pipefail
+          file "$APP/Contents/MacOS/launcher"
+          lipo -info "$APP/Contents/MacOS/launcher" | tee "$RUNNER_TEMP/lipo.txt"
+          grep -q arm64  "$RUNNER_TEMP/lipo.txt"
+          grep -q x86_64 "$RUNNER_TEMP/lipo.txt"
+          codesign -dv --verbose=2 "$APP/Contents/MacOS/launcher" 2>&1 | head -5 || true
+
+      - name: 腳本語法、內容與 LF 換行
+        run: |
+          set -euo pipefail
+          bash -n "$APP/Contents/Resources/script"
+          cmp "$APP/Contents/Resources/script" mac/src/script.sh
+          if LC_ALL=C grep -n $'\r' "$APP/Contents/Resources/script"; then
+            echo "::error::script 含有 CRLF，macOS 會無法執行"
+            exit 1
+          fi
+          echo "bash -n OK；與 src/script.sh 一致；純 LF"
+
+      - name: 檢查內附 Mousecape
+        run: |
+          set -euo pipefail
+          for z in "$APP/Contents/Resources/Mousecape-1820-arm64.zip" \
+                   "$APP/Contents/Resources/Mousecape-0.0.6.zip"; do
+            unzip -tq "$z" >/dev/null
+            unzip -l "$z" | grep -q 'Mousecape.app/Contents/MacOS/mousecloak'
+            echo "OK  $(basename "$z")"
+          done
+
+          tmp="$(mktemp -d)"
+          ditto -x -k "$APP/Contents/Resources/Mousecape-1820-arm64.zip" "$tmp"
+          test -x "$tmp/Mousecape.app/Contents/MacOS/mousecloak"
+          lipo -info "$tmp/Mousecape.app/Contents/MacOS/mousecloak" || true
+          rm -rf "$tmp"
+
+      - name: 檢查發佈 zip（完整性、權限、與 App 一致）
+        run: |
+          set -euo pipefail
+          unzip -tq "$ZIP" >/dev/null
+
+          if unzip -l "$ZIP" | grep -q '__MACOSX'; then
+            echo "::error::zip 內含 __MACOSX，請重新打包"
+            exit 1
+          fi
+
+          unzip -Z -l "$ZIP" | grep 'Contents/MacOS/launcher$'     | grep -q '^-rwx'
+          unzip -Z -l "$ZIP" | grep 'Contents/Resources/script$'   | grep -q '^-rwx'
+
+          tmp="$(mktemp -d)"
+          ditto -x -k "$ZIP" "$tmp"
+          diff -r "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app" "$APP"
+          test -x "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app/Contents/MacOS/launcher"
+          test -x "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app/Contents/Resources/script"
+          test -f "$tmp/喵喵怪游標-for-Mac/使用說明.txt"
+          shasum -a 256 "$ZIP"
+          rm -rf "$tmp"
+
+      - name: 寫入結果摘要
+        run: |
+          {
+            echo "## macOS 靜態檢查"
+            echo ""
+            echo "| 項目 | 結果 |"
+            echo "| --- | --- |"
+            echo "| 執行權限（launcher / script） | ✅ |"
+            echo "| Info.plist / AppSettings / 7 組 .cape | ✅ |"
+            echo "| launcher universal（arm64 + x86_64） | ✅ |"
+            echo "| script 語法 + 純 LF | ✅ |"
+            echo "| 內附 Mousecape 兩個版本 | ✅ |"
+            echo "| 發佈 zip 完整性與權限 | ✅ |"
+            echo ""
+            echo "執行環境：\`$(sw_vers -productVersion) / $(uname -m)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  simulate:
+    name: 無介面流程模擬（安裝 / 還原 / 移除）
+    runs-on: macos-latest
+    needs: static
+    timeout-minutes: 20
+    env:
+      APP: mac/喵喵怪游標.app
+
+    steps:
+      - name: 取出原始碼
+        uses: actions/checkout@v4
+
+      - name: 用假 osascript / Mousecape 跑完整流程
+        run: |
+          set -euo pipefail
+
+          SIM="$RUNNER_TEMP/sim"
+          rm -rf "$SIM"
+          mkdir -p "$SIM/home/Applications/Mousecape.app/Contents/MacOS" "$SIM/bin"
+
+          # 假的 Mousecape：版本 1820，mousecloak 只記錄參數並回報成功
+          cat > "$SIM/home/Applications/Mousecape.app/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleVersion</key>
+            <string>1820</string>
+          </dict>
+          </plist>
+          PLIST
+
+          cat > "$SIM/home/Applications/Mousecape.app/Contents/MacOS/mousecloak" <<'SH'
+          #!/bin/bash
+          printf '%s\n' "$*" >> "${MOUSECLOAK_LOG:?}"
+          if [ "${1:-}" = "-r" ]; then
+            echo "Restored default cursors"
+          else
+            echo "Cursor applied successfully"
+          fi
+          SH
+          chmod +x "$SIM/home/Applications/Mousecape.app/Contents/MacOS/mousecloak"
+
+          # 假的 osascript：清單回傳 SIM_CHOICE，按鈕回傳 SIM_BUTTON（預設第一顆）
+          cat > "$SIM/bin/osascript" <<'SH'
+          #!/bin/bash
+          cat >/dev/null 2>&1 || true
+          if [ "$#" -eq 0 ]; then
+            printf '%s\n' "${SIM_CHOICE:-香蕉天使（喵喵怪游標）}"
+            exit 0
+          fi
+          if [ "$1" = "-" ] && [ "$#" -ge 5 ]; then
+            printf '%s\n' "${SIM_BUTTON:-$2}"
+            exit 0
+          fi
+          exit 0
+          SH
+          chmod +x "$SIM/bin/osascript"
+
+          printf '#!/bin/bash\nexit 0\n' > "$SIM/bin/open"
+          chmod +x "$SIM/bin/open"
+
+          export HOME="$SIM/home"
+          export PATH="$SIM/bin:$PATH"
+          export MOUSECLOAK_LOG="$SIM/mousecloak.log"
+
+          SCRIPT="$APP/Contents/Resources/script"
+          DEST="$HOME/Library/Application Support/Mousecape/capes"
+
+          echo "=== 1) 取消 ==="
+          SIM_CHOICE="__CANCEL__" "$SCRIPT"
+          test ! -e "$DEST/banana.cape"
+
+          echo "=== 2) 安裝「香蕉天使」 ==="
+          SIM_CHOICE="香蕉天使（喵喵怪游標）" "$SCRIPT"
+          test -f "$DEST/banana.cape"
+          cmp "$APP/Contents/Resources/capes/banana.cape" "$DEST/banana.cape"
+          grep -q -- '-a' "$MOUSECLOAK_LOG"
+          grep -q -- '--suppressCopyright' "$MOUSECLOAK_LOG"
+
+          echo "=== 3) 還原預設游標 ==="
+          SIM_CHOICE="還原 macOS 預設游標" "$SCRIPT"
+          grep -q -- '-r' "$MOUSECLOAK_LOG"
+
+          echo "=== 4) 移除 ==="
+          SIM_CHOICE="移除喵喵怪游標" SIM_BUTTON="移除" "$SCRIPT"
+          test ! -e "$DEST/banana.cape"
+
+          echo "全部流程模擬通過"
+
+      - name: 直接啟動 App Bundle（端對端，選用）
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          SIM="$RUNNER_TEMP/sim-e2e"
+          rm -rf "$SIM"
+          mkdir -p "$SIM/home/Applications/Mousecape.app/Contents/MacOS" "$SIM/bin"
+
+          cat > "$SIM/home/Applications/Mousecape.app/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleVersion</key>
+            <string>1820</string>
+          </dict>
+          </plist>
+          PLIST
+
+          cat > "$SIM/home/Applications/Mousecape.app/Contents/MacOS/mousecloak" <<'SH'
+          #!/bin/bash
+          printf '%s\n' "$*" >> "${MOUSECLOAK_LOG:?}"
+          echo "Cursor applied successfully"
+          SH
+          chmod +x "$SIM/home/Applications/Mousecape.app/Contents/MacOS/mousecloak"
+
+          cat > "$SIM/bin/osascript" <<'SH'
+          #!/bin/bash
+          cat >/dev/null 2>&1 || true
+          if [ "$#" -eq 0 ]; then
+            printf '%s\n' "${SIM_CHOICE:-香蕉天使（喵喵怪游標）}"
+            exit 0
+          fi
+          if [ "$1" = "-" ] && [ "$#" -ge 5 ]; then
+            printf '%s\n' "${SIM_BUTTON:-$2}"
+            exit 0
+          fi
+          exit 0
+          SH
+          chmod +x "$SIM/bin/osascript"
+
+          export HOME="$SIM/home"
+          export PATH="$SIM/bin:$PATH"
+          export MOUSECLOAK_LOG="$SIM/mousecloak.log"
+
+          "$APP/Contents/MacOS/launcher" &
+          pid=$!
+          for _ in $(seq 1 60); do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "::error::launcher 60 秒內沒有結束"
+            kill -9 "$pid" 2>/dev/null || true
+            exit 1
+          fi
+          wait "$pid"
+
+          test -f "$HOME/Library/Application Support/Mousecape/capes/banana.cape"
+          echo "App Bundle 端對端啟動成功"
