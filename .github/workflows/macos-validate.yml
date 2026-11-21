@@ -107,22 +107,45 @@ jobs:
       - name: 檢查發佈 zip（完整性、權限、與 App 一致）
         run: |
           set -euo pipefail
-          unzip -tq "$ZIP" >/dev/null
+
+          echo "== 壓縮檔完整性 =="
+          unzip -t "$ZIP" | tail -3
 
           if unzip -l "$ZIP" | grep -q '__MACOSX'; then
             echo "::error::zip 內含 __MACOSX，請重新打包"
             exit 1
           fi
 
-          unzip -Z -l "$ZIP" | grep 'Contents/MacOS/launcher$'     | grep -q '^-rwx'
-          unzip -Z -l "$ZIP" | grep 'Contents/Resources/script$'   | grep -q '^-rwx'
+          echo "== Unix 權限標記 =="
+          python3 - "$ZIP" <<'PY'
+          import sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1])
+          expected = {
+              "Contents/MacOS/launcher": 0o755,
+              "Contents/Resources/script": 0o755,
+          }
+          seen = set()
+          for info in z.infolist():
+              for suffix, mode in expected.items():
+                  if info.filename.endswith(suffix):
+                      actual = (info.external_attr >> 16) & 0o777
+                      print(f"{info.filename}: mode={oct(actual)} create_system={info.create_system}")
+                      assert info.create_system == 3, f"{info.filename}: create_system 不是 Unix"
+                      assert actual == mode, f"{info.filename}: 權限 {oct(actual)} != {oct(mode)}"
+                      seen.add(suffix)
+          missing = set(expected) - seen
+          assert not missing, f"zip 內缺少: {missing}"
+          PY
 
+          echo "== 解壓後與 App 比對 =="
           tmp="$(mktemp -d)"
           ditto -x -k "$ZIP" "$tmp"
           diff -r "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app" "$APP"
           test -x "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app/Contents/MacOS/launcher"
           test -x "$tmp/喵喵怪游標-for-Mac/喵喵怪游標.app/Contents/Resources/script"
           test -f "$tmp/喵喵怪游標-for-Mac/使用說明.txt"
+
+          echo "== SHA256 =="
           shasum -a 256 "$ZIP"
           rm -rf "$tmp"
 
