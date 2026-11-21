@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AcceptsFiles</key>
+	<false/>
+	<key>AcceptsText</key>
+	<false/>
+	<key>Authentication</key>
+	<integer>0</integer>
+	<key>Creator</key>
+	<string>Platypus-5.6.0</string>
+	<key>InterfaceType</key>
+	<string>None</string>
+	<key>InterpreterArgs</key>
+	<array/>
+	<key>InterpreterPath</key>
+	<string>/bin/bash</string>
+	<key>PromptForFileOnLaunch</key>
+	<false/>
+	<key>RemainRunning</key>
+	<false/>
+	<key>ScriptArgs</key>
+	<array/>
+	<key>SendNotifications</key>
+	<false/>
+	<key>URISchemes</key>
+	<array/>
+</dict>
+</plist>

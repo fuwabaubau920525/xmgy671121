@@ -1,0 +1,19 @@
+Mousecape（游標套用工具）
+==========================
+
+本安裝器內附兩個 Mousecape 版本，會依 Mac 的 CPU 自動選擇：
+
+* Apple Silicon（arm64）：Mousecape 1820（Tahoe 相容分支）
+  來源：https://github.com/AdamWawrzynkowskiGF/Mousecape-TahoeSupport
+  版本：PreRelease-v01（1820）
+  說明：macOS 26 Tahoe 起，原版 0.0.6 無法正常套用游標，
+        因此改用這個開源分支的預編譯版本。
+
+* Intel（x86_64）：Mousecape 0.0.6
+  來源：https://github.com/alexzielenski/Mousecape/releases/tag/0.0.6
+
+Mousecape 原始碼：Copyright (c) 2013-2014 Alex Zielenski
+授權：BSD 3-Clause（僅限個人、非商業用途）
+完整授權請見 Mousecape-LICENSE.txt。
+
+本安裝器僅將上述程式原封不動打包，未修改其程式碼。

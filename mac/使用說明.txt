@@ -1,0 +1,65 @@
+喵喵怪游標 for Mac
+==================
+
+【第一次開啟（很重要）】
+1. 解壓縮後，把「喵喵怪游標.app」拖到「應用程式」資料夾。
+2. 第一次開啟時，macOS 會阻擋（因為本 app 沒有 Apple 開發者簽章）。
+   請打開「終端機」，執行下面這一行，然後再開一次：
+     xattr -dr com.apple.quarantine "/Applications/喵喵怪游標.app"
+
+   如果 app 已經放在別的位置，請把上面的路徑換成實際位置。
+   （也可以右鍵 →「打開」；若系統說「已損毀」，一定要用上面的指令。）
+
+【使用】
+1. 開啟「喵喵怪游標.app」。
+2. 從清單選一個主題，按「繼續」。
+3. 第一次會自動安裝 Mousecape（開源游標工具）到 /Applications。
+   * Apple Silicon Mac 會安裝 1820 版（支援 macOS 26 Tahoe）。
+   * Intel Mac 會安裝 0.0.6 版。
+   * 如果 /Applications 不能寫入，會改裝到 ~/Applications。
+4. 套用後游標會立即改變。
+
+【重開機後保留】
+Mousecape 需要它的 Helper Tool 才能在登入後自動套用：
+開啟 Mousecape → 選單列「Mousecape」→「Install Helper Tool」。
+
+【還原 / 移除】
+再次開啟本 app：
+- 「還原 macOS 預設游標」：只還原游標。
+- 「移除喵喵怪游標」：還原游標並刪除已匯入的主題（不會刪除 Mousecape）。
+
+【常見問題】
+Q: 為什麼需要 Mousecape？
+A: macOS 不支援 Windows 的 .ani 游標。本 app 已把 7 個主題轉成
+   Mousecape 的 .cape 格式，並用 Mousecape 的私有 API 套用。
+
+Q: 套用後只有部分游標改變？
+A: macOS 的游標種類比 Windows 多。本 app 會套用最常用的
+   箭頭、忙碌、文字、手指（連結）等游標。
+
+Q: 套用後馬上又變回預設？
+A: 請確認使用的是內附的 Mousecape 1820 版（Apple Silicon），
+   並在 Mousecape 按「Install Helper Tool」。
+   若之前裝過舊版 Mousecape，本 app 會詢問是否更換。
+
+Q: 出現「mousecloak 已損毀」或「無法執行」？
+A: 請執行：
+     xattr -dr com.apple.quarantine /Applications/Mousecape.app
+   或到「系統設定 → 隱私權與安全性」按「仍要打開」。
+
+Q: 需要網路嗎？
+A: 不需要。Mousecape 與所有主題都已包在本 app 內。
+
+【如果 app 真的打不開】
+請打開「終端機」，直接執行安裝腳本（效果完全相同）：
+  bash "/Applications/喵喵怪游標.app/Contents/Resources/script"
+
+【系統需求】
+macOS 11.5 或更新版本（Apple Silicon 或 Intel）。
+
+【版權】
+Mousecape：Copyright (c) 2013-2014 Alex Zielenski，BSD 授權（非商業用途）。
+Apple Silicon 版使用 AdamWawrzynkowskiGF 的 Tahoe 相容分支（同樣為 BSD 授權）。
+啟動器使用 Platypus 的 ScriptExec（BSD 3-Clause，Copyright 2003-2025 Sveinbjorn Thordarson）。
+完整授權請見 Mousecape-LICENSE.txt、Platypus-LICENSE.txt、Mousecape-NOTICE.txt。
+本安裝器僅供個人使用。
