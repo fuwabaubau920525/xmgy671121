@@ -12,4 +12,5 @@ mac/*.app/Contents/Resources/script text eol=lf
 *.icns binary
 *.nib binary
 *.app/Contents/MacOS/launcher binary
+*.app/Contents/_CodeSignature/** binary
 *.app/Contents/Resources/MainMenu.nib/** binary

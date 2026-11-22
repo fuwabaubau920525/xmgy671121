@@ -21,6 +21,8 @@
    xattr -dr com.apple.quarantine "/Applications/喵喵怪游標.app"
    ```
 
+   App 已經做過 **ad-hoc 簽章**（`codesign --sign -`），簽章本身是有效的；但沒有 Apple Developer ID、也無法公證，所以下載後仍會帶隔離屬性。
+
    或在「系統設定 → 隱私權與安全性」最下方按「仍要打開」。
 
 4. 雙擊 `喵喵怪游標.app`，依畫面指示選擇要安裝的游標。
@@ -69,7 +71,7 @@ mac/
 ## 常見問題
 
 **Q：為什麼一定要跑 `xattr`？**
-A：App 沒有 Apple 開發者簽章（免費工具無法取得），從網路下載後會被加上隔離屬性。移除後即可正常開啟。
+A：App 只有 ad-hoc 簽章，沒有 Apple Developer ID，無法通過公證（Notarization）。從網路下載後 macOS 會加上隔離屬性，移除後即可正常開啟。若要做到「雙擊就開、不用任何指令」，需要付費的 Apple Developer Program 憑證。
 
 **Q：開啟後沒反應？**
 A：本 App 是 `LSUIElement`（不顯示 Dock 圖示），流程會在視窗中詢問，完成後自動結束。若完全沒視窗，請確認已執行上面的 `xattr` 指令。
@@ -84,6 +86,7 @@ A：Mousecape 套用後，部分 App 需要重新啟動；也請確認「系統�
 
 - 檢查 `Info.plist`、`AppSettings.plist` 與 7 組 `.cape` 格式
 - 確認 `launcher` / `script` 有執行權限，且 `launcher` 是 arm64 + x86_64 universal
+- 用 `codesign --verify --deep --strict` 驗證 ad-hoc 簽章
 - 確認 `script` 語法正確、純 LF，且與 `src/script.sh` 一致
 - 驗證發佈 zip 的完整性、權限，並與 `喵喵怪游標.app` 逐檔比對
 - 用假的 `osascript` / `Mousecape` 在無介面環境跑一次「安裝 → 還原 → 移除」

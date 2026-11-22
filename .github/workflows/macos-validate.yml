@@ -77,6 +77,16 @@ jobs:
           grep -q x86_64 "$RUNNER_TEMP/lipo.txt"
           codesign -dv --verbose=2 "$APP/Contents/MacOS/launcher" 2>&1 | head -5 || true
 
+      - name: 驗證 App 簽章（ad-hoc）
+        run: |
+          set -euo pipefail
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=4 "$APP" 2>&1 | tee "$RUNNER_TEMP/codesign.txt"
+          grep -q 'Signature=adhoc' "$RUNNER_TEMP/codesign.txt"
+          grep -q 'Identifier=com.chesthai.cursorinstaller' "$RUNNER_TEMP/codesign.txt"
+          codesign -dv --verbose=4 "$APP/Contents/MacOS/launcher" 2>&1 | grep -q 'Signature=adhoc'
+          echo "簽章驗證通過（ad-hoc）"
+
       - name: 腳本語法、內容與 LF 換行
         run: |
           set -euo pipefail
@@ -159,6 +169,7 @@ jobs:
             echo "| 執行權限（launcher / script） | ✅ |"
             echo "| Info.plist / AppSettings / 7 組 .cape | ✅ |"
             echo "| launcher universal（arm64 + x86_64） | ✅ |"
+            echo "| App 簽章（ad-hoc，codesign 嚴格驗證） | ✅ |"
             echo "| script 語法 + 純 LF | ✅ |"
             echo "| 內附 Mousecape 兩個版本 | ✅ |"
             echo "| 發佈 zip 完整性與權限 | ✅ |"
